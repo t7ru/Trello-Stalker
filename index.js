@@ -1,6 +1,5 @@
-const https = require("https");
-const fs = require("fs");
-const path = require("path");
+import fs from "fs";
+import path from "path";
 
 const CONFIG = {
 	trello_url: process.env.TRELLO_JSON_URL,
@@ -33,51 +32,19 @@ function saveState(state) {
 	}
 }
 
-function fetchBoardData() {
-	return new Promise((resolve, reject) => {
-		https
-			.get(CONFIG.trello_url, (res) => {
-				let data = "";
-				res.on("data", (chunk) => (data += chunk));
-				res.on("end", () => {
-					try {
-						resolve(JSON.parse(data));
-					} catch (error) {
-						reject(error);
-					}
-				});
-			})
-			.on("error", reject);
-	});
+async function fetchBoardData() {
+	const res = await fetch(CONFIG.trello_url);
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	return res.json();
 }
 
-function sendDiscordMessage(embed) {
-	return new Promise((resolve, reject) => {
-		const payload = JSON.stringify({
-			embeds: [embed],
-		});
-
-		const url = new URL(CONFIG.discord_webhook);
-		const options = {
-			hostname: url.hostname,
-			path: url.pathname + url.search,
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"Content-Length": Buffer.byteLength(payload),
-			},
-		};
-
-		const req = https.request(options, (res) => {
-			let response = "";
-			res.on("data", (chunk) => (response += chunk));
-			res.on("end", () => resolve(response));
-		});
-
-		req.on("error", reject);
-		req.write(payload);
-		req.end();
+async function sendDiscordMessage(embed) {
+	const res = await fetch(CONFIG.discord_webhook, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ embeds: [embed] }),
 	});
+	return res.text();
 }
 
 function createEmbed(changeType, data) {
